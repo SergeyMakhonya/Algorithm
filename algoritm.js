@@ -1,5 +1,5 @@
 // Операции
-const data = [
+const operations = [
     {
         datetime: '2020-11-30 12:21',
         sum: -146,
@@ -21,6 +21,16 @@ const data = [
         sum: -1538,
         category: 'Продукты'
     },
+    {
+        datetime: '2020-11-14 21:56',
+        sum: -3842,
+        category: 'Продукты'
+    },
+    {
+        datetime: '2020-11-23 20:35',
+        sum: -5375,
+        category: 'Продукты'
+    },
 ];
 
 // Категории
@@ -31,91 +41,104 @@ const categories = [
     'Заправка',
 ];
 
+// Находим критерии для каждой из категорий
+const categoriesCritery = categories.map((categoryName) => {
+    const operationsFromCategory = operations.filter((item) => item.category === categoryName);
+
+    return {
+        name: categoryName,
+        moreZero: !!operationsFromCategory.filter((item) => item.sum > 0).length,
+        lessZero: !!operationsFromCategory.filter((item) => item.sum < 0).length,
+        minSum: getMinSum(operationsFromCategory),
+        maxSum: getMaxSum(operationsFromCategory),
+        minMinutes: getMinMinutes(operationsFromCategory),
+        maxMinutes: getMaxMinutes(operationsFromCategory),
+        dayOfWeeks: getDayOfWeeks(operationsFromCategory),
+    };
+});
+
+//----------
+
 // Массив новых операций (массив только для демонстрации работы алгоритма)
 const newOperations = [
     {
         datetime: '2020-12-01 12:43',
         sum: -195,
     },
+    {
+        datetime: '2020-12-01 19:24',
+        sum: -1354,
+    },
 ];
 
 // Получаем подходящую категорию для каждой новой операции
 for (const newOper of newOperations) {
     console.log(
-        'Операция', newOper,
-        'Подходящая категория', getCategory(newOper)
+        'Операция:', newOper,
+        'Подходящая категория:', getCategory(newOper)
     );
+    console.log()
+    console.log('====================================')
+    console.log()
 }
 
 //---------
 
 function getCategory(newOperation) {
     // 1 этап: узнаём к какой группе операций относится новая операция (доходы или расходы)
-    // и выбираем все операции относящиеся к ней
+    // и выбираем все критерии относящиеся к нему
     const moreZero = newOperation.sum > 0;
-    const filteredOperations = data.filter((item) => moreZero ? item.sum > 0 : item.sum < 0);
+    const filteredCategoriesCritery = categoriesCritery.filter((item) => moreZero ? item.moreZero : item.lessZero);
 
-    // 2 этап: находим критерии для каждой из категорий
-    const categoriesCritery = categories.map((categoryName) => {
-        const operationsFromCategory = filteredOperations.filter((item) => item.category === categoryName);
-
-        return {
-            name: categoryName,
-            minSum: getMinSum(operationsFromCategory),
-            maxSum: getMaxSum(operationsFromCategory),
-            minMinutes: getMinMinutes(operationsFromCategory),
-            maxMinutes: getMaxMinutes(operationsFromCategory),
-            dayOfWeeks: getDayOfWeeks(operationsFromCategory),
-        };
-    });
-
-    // 3 этап: назначаем баллы по критериям
+    // 2 этап: назначаем баллы по критериям
     const candidats = [...categories].map((categoryName) => ({
         name: categoryName,
         score:
-            getScoreSum(newOperation.sum, categoryName)
-            + getScoreMinutes(newOperation.datetime, categoryName)
-            + getScoreDayOfWeek(newOperation.datetime, categoryName),
+            getScoreSum(filteredCategoriesCritery, newOperation.sum, categoryName)
+            + getScoreMinutes(filteredCategoriesCritery, newOperation.datetime, categoryName)
+            + getScoreDayOfWeek(filteredCategoriesCritery, newOperation.datetime, categoryName),
     }));
 
-    // 4 этап: выбираем категорию у которой самый максимальный балл
+    // 3 этап: выбираем категорию у которой самый максимальный балл
+    let maxScore = 0;
     let maxScoreCategory = null;
 
     for (const category of candidats) {
-        if (!maxScoreCategory || category.score > maxScoreCategory.score) {
+        if (category.score > maxScore) {
+            maxScore = category.score;
             maxScoreCategory = category;
         }
     }
 
-    console.log('Критерии отбора: ', categoriesCritery);
+    console.log('Критерии отбора: ', filteredCategoriesCritery);
     console.log('Кандидаты: ', candidats);
 
-    return maxScoreCategory.name;
+    return !!maxScoreCategory ? maxScoreCategory.name : null;
 }
 
-// Возвращаем 1 балл, если сумма входит в диапазон сумм указанной категории
-function getScoreSum(sum, categoryName) {
+// Возвращаем 3 балла, если сумма входит в диапазон сумм указанной категории
+function getScoreSum(categoriesCritery, sum, categoryName) {
     const result = categoriesCritery
         .filter((category) =>
             category.name === categoryName 
             && sum >= category.minSum 
             && sum <= category.maxSum);
-    return result.length ? 1 : 0;
+    return result.length ? 2 : 0;
 }
 
-// Возвращаем 1 балл, если время входит в диапазон времени указанной категории
-function getScoreMinutes(datetimeString, categoryName) {
+// Возвращаем 2 балла, если время входит в диапазон времени указанной категории
+function getScoreMinutes(categoriesCritery, datetimeString, categoryName) {
     const minutes = getMinutesFromDateString(datetimeString);
     const result = categoriesCritery
         .filter((category) =>
             category.name === categoryName 
             && minutes >= category.minMinutes 
             && minutes <= category.maxMinutes);
-    return result.length ? 1 : 0;
+    return result.length ? 2 : 0;
 }
 
 // Возвращаем 1 балл, если день недели входит в диапазон дней недель указанной категории
-function getScoreDayOfWeek(datetimeString, categoryName) {
+function getScoreDayOfWeek(categoriesCritery, datetimeString, categoryName) {
     const dayOfWeek = getDayOfWeekFromDateString(datetimeString);
     const result = categoriesCritery
         .filter((category) =>
